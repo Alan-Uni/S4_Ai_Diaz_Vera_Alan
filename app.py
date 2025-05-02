@@ -326,7 +326,7 @@ for idx, t in enumerate(st.session_state.transacciones, start=1):
 
 libro_diario = pd.DataFrame(libro_diario_rows)
 libro_diario = libro_diario.rename(columns={
-    "Num de transacción": "Num de transacción"  # Forzar nombre consistente
+    "Num de transacción": "Num de transacción" 
 })[["FECHA", "CUENTAS", "Num de transacción", "DEBE", "HABER"]]
 
 totales = pd.DataFrame({
@@ -343,66 +343,82 @@ st.dataframe(libro_diario)
 
 
 
+# Libro Mayor Modificado
+st.subheader("Libro Mayor")
+cuentas_mayor = {}
 
-st.subheader("Libro Mayor ")
-cuentas_mayor = {
-    "Caja": {"Debe": [], "Haber": []},
-    "Bancos": {"Debe": [], "Haber": []},
-    "Compras": {"Debe": [], "Haber": []},
-    "Descuentos Compras": {"Debe": [], "Haber": []},
-    "Devoluciones Compras": {"Debe": [], "Haber": []},
-    "Rebajas Compras": {"Debe": [], "Haber": []},
-    "IVA acreditable": {"Debe": [], "Haber": []},  
-    "Ventas": {"Debe": [], "Haber": []},
-    "Descuentos Ventas": {"Debe": [], "Haber": []},
-    "Devoluciones Ventas": {"Debe": [], "Haber": []},
-    "Rebajas Ventas": {"Debe": [], "Haber": []},
-    "IVA trasladado": {"Debe": [], "Haber": []},  
-}
-
-
+# Procesar transacciones con tipo
 for t in st.session_state.transacciones:
+    tipo_transaccion = t["tipo"]
     for cuenta, monto in t["cargos"].items():
-        if cuenta not in cuentas_mayor:  
-            cuentas_mayor[cuenta] = {"Debe": [], "Haber": []}
-        cuentas_mayor[cuenta]["Debe"].append(abs(monto))
-        cuentas_mayor[cuenta]["Haber"].append(0.00)
+        if cuenta not in cuentas_mayor:
+            cuentas_mayor[cuenta] = {"Transacciones": []}
+        cuentas_mayor[cuenta]["Transacciones"].append({
+            "Tipo": tipo_transaccion,
+            "Debe": monto,
+            "Haber": 0.00
+        })
     
     for cuenta, monto in t["abonos"].items():
-        if cuenta not in cuentas_mayor:  
-            cuentas_mayor[cuenta] = {"Debe": [], "Haber": []}
-        cuentas_mayor[cuenta]["Haber"].append(abs(monto))
-        cuentas_mayor[cuenta]["Debe"].append(0.00)
+        if cuenta not in cuentas_mayor:
+            cuentas_mayor[cuenta] = {"Transacciones": []}
+        cuentas_mayor[cuenta]["Transacciones"].append({
+            "Tipo": tipo_transaccion,
+            "Debe": 0.00,
+            "Haber": monto
+        })
 
-for cuenta, movimientos in cuentas_mayor.items():
-    st.markdown(f"**{cuenta}**")
+# Mostrar libro mayor por cuenta
+for cuenta, datos in cuentas_mayor.items():
+    st.markdown(f"### {cuenta}")
     
-   
-    max_len = max(len(movimientos["Debe"]), len(movimientos["Haber"]))
+    # Crear DataFrame con transacciones
+    df = pd.DataFrame(datos["Transacciones"])
     
-    movimientos["Debe"] += [0.00] * (max_len - len(movimientos["Debe"]))
-    movimientos["Haber"] += [0.00] * (max_len - len(movimientos["Haber"]))
+    # Calcular totales y saldo
+    total_debe = df["Debe"].sum()
+    total_haber = df["Haber"].sum()
+    saldo = total_debe - total_haber
+    saldo_abs = abs(saldo)
+    saldo_tipo = "DEBE" if saldo > 0 else "HABER" if saldo < 0 else "CERO"
     
-    df = pd.DataFrame({
-        "Debe": movimientos["Debe"],
-        "Haber": movimientos["Haber"]
-    })
+    # Formatear montos
+    df["Debe"] = df["Debe"].apply(lambda x: f"${x:,.2f}" if x > 0 else "")
+    df["Haber"] = df["Haber"].apply(lambda x: f"${x:,.2f}" if x > 0 else "")
     
-    st.dataframe(df)
-    st.write(f"**Saldo:** ${sum(df['Debe']) - sum(df['Haber']):,.2f}")
+    # Mostrar tabla
+    st.dataframe(
+        df,
+        column_config={
+            "Tipo": "Transacción",
+            "Debe": st.column_config.Column("Debe", width="medium"),
+            "Haber": st.column_config.Column("Haber", width="medium")
+        },
+        hide_index=True,
+        use_container_width=True
+    )
+    
+    # Mostrar saldo formateado
+    st.markdown(f"""
+    **Saldo:**  
+    ${saldo_abs:,.2f} ({saldo_tipo if saldo_tipo != "CERO" else ""})
+    """)
+    
     st.markdown("---")
 
 
+st.subheader("Balanza de Comprobación")
 
-st.subheader("Balanza de Comprobación ")
-
+# Calcular movimientos desde el nuevo formato del Libro Mayor
 balanza_data = []
-for cuenta in cuentas_mayor:
-    mov_debe = sum(cuentas_mayor[cuenta]["Debe"])
-    mov_haber = sum(cuentas_mayor[cuenta]["Haber"])
+for cuenta, datos in cuentas_mayor.items():
+    # Sumar todos los débitos y créditos de las transacciones
+    mov_debe = sum(t["Debe"] for t in datos["Transacciones"])
+    mov_haber = sum(t["Haber"] for t in datos["Transacciones"])
     
-    saldo_debe = max(mov_debe - mov_haber, 0)  
-    saldo_haber = max(mov_haber - mov_debe, 0)  
+    # Calcular saldos
+    saldo_debe = max(mov_debe - mov_haber, 0)
+    saldo_haber = max(mov_haber - mov_debe, 0)
     
     balanza_data.append({
         "Cuenta": cuenta,
@@ -412,6 +428,7 @@ for cuenta in cuentas_mayor:
         "Saldo_Haber": saldo_haber if saldo_haber > 0 else ""
     })
 
+# Resto del código permanece igual...
 df_balanza = pd.DataFrame(balanza_data)
 
 total_mov_debe = df_balanza["Mov_Debe"].sum()
