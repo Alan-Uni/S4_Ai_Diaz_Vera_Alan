@@ -343,11 +343,9 @@ st.dataframe(libro_diario)
 
 
 
-# Libro Mayor Modificado
 st.subheader("Libro Mayor")
 cuentas_mayor = {}
 
-# Procesar transacciones con tipo
 for t in st.session_state.transacciones:
     tipo_transaccion = t["tipo"]
     for cuenta, monto in t["cargos"].items():
@@ -368,25 +366,20 @@ for t in st.session_state.transacciones:
             "Haber": monto
         })
 
-# Mostrar libro mayor por cuenta
 for cuenta, datos in cuentas_mayor.items():
     st.markdown(f"### {cuenta}")
     
-    # Crear DataFrame con transacciones
     df = pd.DataFrame(datos["Transacciones"])
     
-    # Calcular totales y saldo
     total_debe = df["Debe"].sum()
     total_haber = df["Haber"].sum()
     saldo = total_debe - total_haber
     saldo_abs = abs(saldo)
     saldo_tipo = "DEBE" if saldo > 0 else "HABER" if saldo < 0 else "CERO"
     
-    # Formatear montos
     df["Debe"] = df["Debe"].apply(lambda x: f"${x:,.2f}" if x > 0 else "")
     df["Haber"] = df["Haber"].apply(lambda x: f"${x:,.2f}" if x > 0 else "")
     
-    # Mostrar tabla
     st.dataframe(
         df,
         column_config={
@@ -398,7 +391,6 @@ for cuenta, datos in cuentas_mayor.items():
         use_container_width=True
     )
     
-    # Mostrar saldo formateado
     st.markdown(f"""
     **Saldo:**  
     ${saldo_abs:,.2f} ({saldo_tipo if saldo_tipo != "CERO" else ""})
@@ -409,14 +401,11 @@ for cuenta, datos in cuentas_mayor.items():
 
 st.subheader("Balanza de Comprobación")
 
-# Calcular movimientos desde el nuevo formato del Libro Mayor
 balanza_data = []
 for cuenta, datos in cuentas_mayor.items():
-    # Sumar todos los débitos y créditos de las transacciones
     mov_debe = sum(t["Debe"] for t in datos["Transacciones"])
     mov_haber = sum(t["Haber"] for t in datos["Transacciones"])
     
-    # Calcular saldos
     saldo_debe = max(mov_debe - mov_haber, 0)
     saldo_haber = max(mov_haber - mov_debe, 0)
     
@@ -428,7 +417,6 @@ for cuenta, datos in cuentas_mayor.items():
         "Saldo_Haber": saldo_haber if saldo_haber > 0 else ""
     })
 
-# Resto del código permanece igual...
 df_balanza = pd.DataFrame(balanza_data)
 
 total_mov_debe = df_balanza["Mov_Debe"].sum()
